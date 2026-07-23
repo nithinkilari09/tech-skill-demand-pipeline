@@ -24,22 +24,26 @@ Illustrator/Canva/HubSpot) — full detail in BUILD_LOG.md.
 🟢 **Silver layer complete and hand-verified** — 1,002 postings deduped on
 `(source, job_id)`, classified into a fixed CS-domain taxonomy (title → extracted skills →
 tags, including German-language title patterns) plus a second, coarser `broad_field`
-dimension (Sales & Marketing, Finance & Accounting, Healthcare, Skilled Trades,
-Administrative/Support, Education, Retail & Customer Service, Hospitality & Food Service,
-Manufacturing & Logistics, Legal & HR, Other — four rounds of buckets, final), and matched
-against a 61-entry skill dictionary into a posting-to-skill fact table (1,039 rows). Final
-CS-domain distribution: `other/uncategorized` 873/1002 (87.1%, confirmed genuine non-tech
-job-board composition, not a classifier gap — RemoteOK, 100% English, sits at 83.8% too),
-full-stack 27, data analyst 26, data engineer 24, frontend 22, backend 21, mobile 9. Within
-that 873, the broad_field passes give 522 postings (60%) a meaningful non-tech field label
-(Sales & Marketing 265, Finance & Accounting 131, Administrative/Support 54, Legal & HR 22,
-Skilled Trades 21, Manufacturing & Logistics 20, Hospitality & Food Service 4, Retail &
-Customer Service 3, Healthcare 2), leaving 351 (40%) in a final, accepted long tail —
-stopped narrowing further per an explicit decision to move to Gold rather than chase
-diminishing returns. Skill extraction was hand-checked against real postings throughout,
-catching and fixing five real bugs total (Unicode-boundary regex, undecoded HTML entities,
-English-word ambiguity on "Go", a soft-hyphen character breaking a German title match, and
-missing "`<Language> Entwickler`" title coverage) — full detail in BUILD_LOG.md.
+dimension — 12 buckets across five rounds (Sales & Marketing, Finance & Accounting,
+Healthcare, Skilled Trades, Administrative/Support, Education, Retail & Customer Service,
+Hospitality & Food Service, Manufacturing & Logistics, Legal & HR, IT Support &
+Infrastructure, Project & Product Management, Other) — and matched against a 61-entry
+skill dictionary into a posting-to-skill fact table (1,039 rows). Final CS-domain
+distribution: `other/uncategorized` 873/1002 (87.1%, confirmed genuine non-tech job-board
+composition, not a classifier gap — RemoteOK, 100% English, sits at 83.8% too), full-stack
+27, data analyst 26, data engineer 24, frontend 22, backend 21, mobile 9. Within that 873,
+the broad_field passes now give 652 postings (75%) a meaningful non-tech field label
+(Sales & Marketing 261, Finance & Accounting 131, IT Support & Infrastructure 78, Project &
+Product Management 57, Administrative/Support 53, Legal & HR 22, Skilled Trades 21,
+Manufacturing & Logistics 20, Hospitality & Food Service 4, Retail & Customer Service 3,
+Healthcare 2), leaving 221 (25%) genuinely unclassified — the last two buckets (IT Support
+& Infrastructure, Project & Product Management) were added specifically because a ~40-45%
+"Other" wedge would have made dashboard charts hard to read; found by hand-reading all 448
+`Other`-bucket titles rather than guessing. Skill extraction was hand-checked against real
+postings throughout, catching and fixing five real bugs total (Unicode-boundary regex,
+undecoded HTML entities, English-word ambiguity on "Go", a soft-hyphen character breaking a
+German title match, and missing "`<Language> Entwickler`" title coverage) — full detail in
+BUILD_LOG.md.
 
 Milestones (each confirmed with the project owner before moving to the next):
 - [x] RemoteOK + Arbeitnow ingestion script (pooling, tested against live APIs)
@@ -255,6 +259,11 @@ correct at this data scale):
 Both skill-demand tables deliberately include every skill (CS and non-CS) against **both**
 dimensions rather than splitting the dictionary in half — Excel is real signal under both
 `data analyst` (domain) and `Finance & Accounting` (broad_field).
+
+**Dashboard convention:** charts exclude `domain = 'other/uncategorized'` and
+`broad_field = 'Other'` rather than visualizing an "unidentified skills" wedge — both
+columns are plain filterable fields on the Gold tables, so this needs no extra
+aggregation, just a `WHERE` clause in the dashboard's queries.
 
 ## Setup
 
