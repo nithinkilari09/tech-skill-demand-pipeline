@@ -482,16 +482,18 @@ cleaned_postings = deduped.withColumn(
 # MAGIC the large `other/uncategorized` CS-domain bucket some structure, since
 # MAGIC hand-checking real postings confirmed most of it is genuinely non-tech
 # MAGIC work (accounting, sales/marketing, healthcare, skilled trades,
-# MAGIC administrative/support, education), not a CS-domain classifier gap --
-# MAGIC see BUILD_LOG.md. Deliberately simpler than the CS-domain classifier
-# MAGIC (title -> a modest tool-based skill signal -> tags, same priority order,
-# MAGIC but shallower keyword lists per bucket): this only needs to be
-# MAGIC directionally useful, not as rigorously verified as the primary taxonomy.
-# MAGIC Every posting gets a broad_field value, including ones with a real
-# MAGIC CS domain (those just won't match any non-tech bucket and will fall to
-# MAGIC "Other" here, which is fine -- this column is only surfaced in the
-# MAGIC dashboard's separate "Beyond Tech" section, not mixed into the primary
-# MAGIC domain breakdown).
+# MAGIC administrative/support, education, retail, hospitality, manufacturing/
+# MAGIC logistics, legal/HR), not a CS-domain classifier gap -- see BUILD_LOG.md.
+# MAGIC Deliberately simpler than the CS-domain classifier (title -> a modest
+# MAGIC tool-based skill signal -> tags, same priority order, but shallower
+# MAGIC keyword lists per bucket): this only needs to be directionally useful,
+# MAGIC not as rigorously verified as the primary taxonomy -- confirmed with the
+# MAGIC project owner as the final round of broad_field buckets, not chasing the
+# MAGIC unclassified percentage further after this. Every posting gets a
+# MAGIC broad_field value, including ones with a real CS domain (those just
+# MAGIC won't match any non-tech bucket and will fall to "Other" here, which is
+# MAGIC fine -- this column is only surfaced in the dashboard's separate "Beyond
+# MAGIC Tech" section, not mixed into the primary domain breakdown).
 
 # COMMAND ----------
 
@@ -539,6 +541,29 @@ BROAD_FIELD_RULES = [
     ("Education", [
         r"\blehrer\b", r"\bdozent\b", r"\bausbilder\b", r"\bteacher\b",
         r"\bprofessor\b", r"\btutor\b", r"\binstructor\b",
+    ]),
+    # Fourth and final round of broad_field buckets -- same lightweight,
+    # directionally-useful keyword approach as the buckets above, not the
+    # hand-verification rigor used for the CS-domain taxonomy. This is the
+    # last round; a long tail of niche fields will still fall to "Other".
+    ("Retail & Customer Service", [
+        r"\bstore manager\b", r"\bfilialleiter\b", r"\bretail\b", r"\bcashier\b",
+        r"\bverkäufer", r"\bverkaufsberater", r"\bfiliale\b", r"\bshop\b",
+    ]),
+    ("Hospitality & Food Service", [
+        r"\bhotel\b", r"\brestaurant\b", r"\bkoch\b", r"\bküche\b",
+        r"\bgastronomie\b", r"\bbarista\b", r"\bkellner\b", r"\bhospitality\b",
+    ]),
+    ("Manufacturing & Logistics", [
+        r"\bproduktion", r"\bfertigung\b", r"\blager\b", r"\blogistik\b",
+        r"\blogistics\b", r"\bwarehouse\b", r"\bsupply chain\b", r"\beinkauf",
+        r"\bprocurement\b", r"\bmanufacturing\b", r"\bmontage\b",
+    ]),
+    ("Legal & HR", [
+        r"\brecruiter\b", r"\brecruiting\b", r"\bpersonalberater\b",
+        r"\bpersonalsachbearbeiter\b", r"\brechtsanwalt\b", r"\bjurist\b",
+        r"\blegal\b", r"\bcompliance\b", r"\blawyer\b", r"\battorney\b",
+        r"\bra-spezialist", r"\bkanzlei\b",
     ]),
 ]
 _broad_field_compiled = [(name, [re.compile(p, re.IGNORECASE) for p in pats]) for name, pats in BROAD_FIELD_RULES]
