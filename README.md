@@ -52,8 +52,9 @@ Milestones (each confirmed with the project owner before moving to the next):
 - [x] Bronze layer reading real data into Delta tables
 - [x] Silver layer: dedup, domain classification, skill extraction (hand-verified)
 - [x] Gold layer (skill-demand-by-domain and by-broad_field aggregates), verified via the Databricks SQL warehouse
-- [ ] GitHub Pages dashboard live (Plotly, static HTML, via `databricks-sql-connector`)
-- [ ] Databricks Workflows DAG scheduled (`Trigger.AvailableNow`)
+- [x] Databricks Workflows DAG scheduled (Bronze ×2 → Silver → Gold, daily 04:00 UTC, verified via a real triggered run)
+- [ ] GitHub Actions: daily ingestion → S3 upload, on a schedule (workflow written, secrets set, not yet verified running in GitHub's own infrastructure)
+- [ ] GitHub Pages dashboard live (Plotly, static HTML, via `databricks-sql-connector`; built and verified locally, not yet deployed)
 
 ## Architecture
 

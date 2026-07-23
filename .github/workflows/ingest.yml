@@ -1,0 +1,33 @@
+name: Ingest postings and upload to S3
+
+on:
+  schedule:
+    # Daily, ahead of the Databricks job's 04:00 UTC Bronze/Silver/Gold run
+    # (scripts/setup_databricks_job.py) so that run always sees today's batch.
+    - cron: "0 3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests boto3
+
+      - name: Pool postings from RemoteOK + Arbeitnow
+        run: python -m ingestion.pool_postings
+
+      - name: Upload to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: python -m scripts.upload_to_s3
