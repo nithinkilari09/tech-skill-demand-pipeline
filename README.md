@@ -14,11 +14,19 @@ or visa sponsorship.
 ## Status
 
 🟢 **Silver layer complete and hand-verified** — 1,002 postings deduped on
-`(source, job_id)`, classified into a fixed domain taxonomy, and matched against a
-51-entry skill dictionary into a posting-to-skill fact table (805 rows). Skill-extraction
-output was hand-checked against real postings, which caught and fixed three real bugs
-(a Unicode-boundary regex bug, undecoded HTML entities, and English-word ambiguity on
-"Go") — full detail in BUILD_LOG.md.
+`(source, job_id)`, classified into a fixed CS-domain taxonomy (title → extracted skills →
+tags, including German-language title patterns) plus a second, coarser `broad_field`
+dimension (Sales & Marketing, Finance & Accounting, Healthcare, Skilled Trades,
+Administrative/Support, Education, Other), and matched against a 61-entry skill dictionary
+into a posting-to-skill fact table (1,039 rows). Final CS-domain distribution:
+`other/uncategorized` 873/1002 (87.1%, confirmed genuine non-tech job-board composition,
+not a classifier gap — RemoteOK, 100% English, sits at 83.8% too), full-stack 27, data
+analyst 26, data engineer 24, frontend 22, backend 21, mobile 9. Within that 873, the
+broad_field pass gives 481 postings (55%) a meaningful non-tech field label. Skill
+extraction was hand-checked against real postings throughout, catching and fixing five
+real bugs total (Unicode-boundary regex, undecoded HTML entities, English-word ambiguity
+on "Go", a soft-hyphen character breaking a German title match, and missing "`<Language>
+Entwickler`" title coverage) — full detail in BUILD_LOG.md.
 
 Milestones (each confirmed with the project owner before moving to the next):
 - [x] RemoteOK + Arbeitnow ingestion script (pooling, tested against live APIs)
@@ -175,16 +183,35 @@ Three Delta tables in `tech_skill_demand.silver`:
 | `posting_skills`     | one row per `(source, job_id, skill)` | fact table — a posting mentioning 5 tools produces 5 rows |
 | `skill_dictionary`   | one row per skill        | the maintained keyword dictionary itself, as queryable data (skill → category), not just code |
 
-**Domain classification** is rule-based (regex over title, then tags as fallback), a
-fixed taxonomy: `data engineer`, `data analyst`, `frontend`, `full-stack`, `backend`,
-`mobile`, `other/uncategorized`. Titles that don't clearly match land in
-`other/uncategorized` on purpose — forcing a weak match would be worse than an honest
-"doesn't fit" bucket. **Known limitation:** many Arbeitnow postings have German-language
-titles this English-only rule set can't match, systematically under-representing them in
-the domain breakdown.
+**Domain classification** (`domain` column) is rule-based, a fixed CS taxonomy: `data
+engineer`, `data analyst`, `frontend`, `full-stack`, `backend`, `mobile`,
+`other/uncategorized`, checked in priority order: title patterns (English and German) →
+extracted skills as a second signal (e.g. dbt/Airflow/Spark anywhere in the posting →
+data engineer, even with a generic title) → tags as a last resort. Titles/skills that
+don't clearly match land in `other/uncategorized` on purpose — forcing a weak match would
+be worse than an honest "doesn't fit" bucket. Final distribution: `other/uncategorized`
+873/1002 (87.1%), full-stack 27, data analyst 26, data engineer 24, frontend 22, backend
+21, mobile 9. **Confirmed not a language-coverage gap:** RemoteOK postings (100% English)
+sit at a similarly high 83.8% `other/uncategorized` rate, so the residual is genuine
+non-tech job-board composition (accounting, sales, HR, skilled trades, etc.), not a
+solvable classifier problem — see BUILD_LOG.md's 2026-07-23 recovery entry for the full
+investigation, including two real bugs found while adding German title patterns (a soft
+hyphen breaking a match, missing "`<Language> Entwickler`" coverage).
 
-**Skill extraction** matches a 51-entry hand-curated dictionary (languages, cloud, data
-tools, databases, BI tools, frameworks, devops, ML) case-insensitively with word
+**Broad-field classification** (`broad_field` column) is a second, coarser, deliberately
+less-rigorous dimension that exists to give the large `other/uncategorized` bucket some
+structure for a planned "Beyond Tech" dashboard section: `Sales & Marketing`, `Finance &
+Accounting`, `Healthcare`, `Skilled Trades`, `Administrative/Support`, `Education`,
+`Other`. Same title → skill-signal → tags priority pattern as `domain`, shallower keyword
+lists. Within the 873 `other/uncategorized` postings: Sales & Marketing 266, Finance &
+Accounting 131, Administrative/Support 61, Skilled Trades 21, Healthcare 2, still
+unclassified 392 (45%) — 55% of the CS-domain "other" bucket now carries a meaningful
+label.
+
+**Skill extraction** matches a 61-entry hand-curated dictionary (languages, cloud, data
+tools, databases, BI tools, frameworks, devops, ML, plus a modest non-CS tool set —
+Salesforce, HubSpot, QuickBooks, SAP, Photoshop, Illustrator, Canva, AutoCAD, Zendesk,
+Mailchimp — feeding the broad_field "Beyond Tech" story) case-insensitively with word
 boundaries — except `R`, `C`, and `Go`, which get case-sensitive, context-aware patterns.
 These three went through several rounds of hand-verification against real postings before
 landing on patterns that held up — see BUILD_LOG.md's 2026-07-23 Silver entry for the
