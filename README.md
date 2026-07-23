@@ -13,44 +13,23 @@ or visa sponsorship.
 
 ## Status
 
-🟢 **Live: https://nithinkilari09.github.io/tech-skill-demand-pipeline/** — the full
-pipeline is now genuinely scheduled end to end, not manually triggered at any stage.
-GitHub Actions pools postings daily, a Databricks Job runs Bronze→Silver→Gold right after,
-and this dashboard rebuilds itself once Gold is fresh — every schedule verified with a real
-triggered run (not just its definition), including a fresh S3 object confirmed after the
-ingestion workflow's first live run.
+🟢 **Live dashboard: https://nithinkilari09.github.io/tech-skill-demand-pipeline/**
 
-🟢 **Gold layer complete and independently verified** — four Delta tables under
-`tech_skill_demand.gold` (`domain_summary`, `skill_demand_by_domain`,
-`broad_field_summary`, `skill_demand_by_broad_field`) aggregating Silver's skill/domain
-data for the dashboard. Top skills per domain read as a believable real distribution
-(data analyst → Power BI/Python/SQL/Excel; data engineer → Python/Docker/AWS/Kubernetes;
-frontend → HTML/JavaScript/CSS/TypeScript/React; Sales & Marketing → Photoshop/
-Illustrator/Canva/HubSpot) — full detail in BUILD_LOG.md.
+The full pipeline runs on its own schedule end to end, with no manual step at any stage:
+GitHub Actions pools RemoteOK + Arbeitnow daily, a Databricks Job runs Bronze → Silver →
+Gold right after, and the dashboard above rebuilds itself once Gold is fresh — every
+schedule verified with a real triggered run, not just its definition.
 
-🟢 **Silver layer complete and hand-verified** — 1,002 postings deduped on
-`(source, job_id)`, classified into a fixed CS-domain taxonomy (title → extracted skills →
-tags, including German-language title patterns) plus a second, coarser `broad_field`
-dimension — 12 buckets across five rounds (Sales & Marketing, Finance & Accounting,
-Healthcare, Skilled Trades, Administrative/Support, Education, Retail & Customer Service,
-Hospitality & Food Service, Manufacturing & Logistics, Legal & HR, IT Support &
-Infrastructure, Project & Product Management, Other) — and matched against a 61-entry
-skill dictionary into a posting-to-skill fact table (1,039 rows). Final CS-domain
-distribution: `other/uncategorized` 873/1002 (87.1%, confirmed genuine non-tech job-board
-composition, not a classifier gap — RemoteOK, 100% English, sits at 83.8% too), full-stack
-27, data analyst 26, data engineer 24, frontend 22, backend 21, mobile 9. Within that 873,
-the broad_field passes now give 652 postings (75%) a meaningful non-tech field label
-(Sales & Marketing 261, Finance & Accounting 131, IT Support & Infrastructure 78, Project &
-Product Management 57, Administrative/Support 53, Legal & HR 22, Skilled Trades 21,
-Manufacturing & Logistics 20, Hospitality & Food Service 4, Retail & Customer Service 3,
-Healthcare 2), leaving 221 (25%) genuinely unclassified — the last two buckets (IT Support
-& Infrastructure, Project & Product Management) were added specifically because a ~40-45%
-"Other" wedge would have made dashboard charts hard to read; found by hand-reading all 448
-`Other`-bucket titles rather than guessing. Skill extraction was hand-checked against real
-postings throughout, catching and fixing five real bugs total (Unicode-boundary regex,
-undecoded HTML entities, English-word ambiguity on "Go", a soft-hyphen character breaking a
-German title match, and missing "`<Language> Entwickler`" title coverage) — full detail in
-BUILD_LOG.md.
+**Pipeline summary:**
+- 1,002 postings deduped, classified into a fixed CS-domain taxonomy (data engineer, data
+  analyst, frontend, full-stack, backend, mobile) plus a secondary `broad_field` dimension
+  covering 11 non-tech categories (Sales & Marketing, Finance & Accounting, IT Support &
+  Infrastructure, Project & Product Management, and others).
+- Skill/tool extraction against a 61-entry hand-curated dictionary, matched into a
+  posting-to-skill fact table.
+- Four Gold Delta tables (`domain_summary`, `skill_demand_by_domain`,
+  `broad_field_summary`, `skill_demand_by_broad_field`) serve the dashboard directly off
+  the Databricks SQL warehouse.
 
 Milestones (each confirmed with the project owner before moving to the next):
 - [x] RemoteOK + Arbeitnow ingestion script (pooling, tested against live APIs)
@@ -150,7 +129,6 @@ in the HTML/JS Plotly generates.
 
 ```
 tech-skill-demand-pipeline/
-├── BUILD_LOG.md            # engineering journal — reasoning, decisions, what broke, written as-we-go
 ├── README.md                # you are here
 ├── requirements.txt
 ├── ingestion/                 # pools RemoteOK + Arbeitnow, lands raw partitioned JSONL
@@ -225,9 +203,8 @@ be worse than an honest "doesn't fit" bucket. Final distribution: `other/uncateg
 21, mobile 9. **Confirmed not a language-coverage gap:** RemoteOK postings (100% English)
 sit at a similarly high 83.8% `other/uncategorized` rate, so the residual is genuine
 non-tech job-board composition (accounting, sales, HR, skilled trades, etc.), not a
-solvable classifier problem — see BUILD_LOG.md's 2026-07-23 recovery entry for the full
-investigation, including two real bugs found while adding German title patterns (a soft
-hyphen breaking a match, missing "`<Language> Entwickler`" coverage).
+solvable classifier problem. Adding German title patterns surfaced two real bugs along
+the way: a soft hyphen breaking a match, and missing "`<Language> Entwickler`" coverage.
 
 **Broad-field classification** (`broad_field` column) is a second, coarser, deliberately
 less-rigorous dimension that exists to give the large `other/uncategorized` bucket some
@@ -250,9 +227,8 @@ Salesforce, HubSpot, QuickBooks, SAP, Photoshop, Illustrator, Canva, AutoCAD, Ze
 Mailchimp — feeding the broad_field "Beyond Tech" story) case-insensitively with word
 boundaries — except `R`, `C`, and `Go`, which get case-sensitive, context-aware patterns.
 These three went through several rounds of hand-verification against real postings before
-landing on patterns that held up — see BUILD_LOG.md's 2026-07-23 Silver entry for the
-full investigation (a Unicode-boundary regex bug, undecoded HTML entities, and "Go"
-requiring co-occurrence with another recognized language to count, since it's an ordinary
+landing on patterns that held up (a Unicode-boundary regex bug, undecoded HTML entities, and
+"Go" requiring co-occurrence with another recognized language to count, since it's an ordinary
 English word otherwise). The dictionary is explicitly a maintained list, not exhaustive —
 extend `SKILL_DICTIONARY` in `notebooks/silver_transform.py` as new tools show up.
 

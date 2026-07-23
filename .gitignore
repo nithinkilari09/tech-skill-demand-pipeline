@@ -18,6 +18,10 @@ dashboard/dist/
 *.key
 credentials.json
 
+# Private engineering journal -- kept locally only, not part of the public
+# repo (purged from git history 2026-07-23 at the project owner's request)
+BUILD_LOG.md
+
 # OS / editor cruft
 .DS_Store
 .vscode/
