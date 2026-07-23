@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Generated data (large, reproducible via ingestion/pool_postings.py)
+data/raw/**/*.jsonl
+data/raw/**/*.json
+
+# Secrets / credentials (AWS, Snowflake, Databricks tokens)
+.env
+*.pem
+*.key
+credentials.json
+
+# OS / editor cruft
+.DS_Store
+.vscode/
+.idea/

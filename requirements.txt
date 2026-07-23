@@ -1,0 +1,12 @@
+# --- Step 1: ingestion (RemoteOK + Arbeitnow pooling) ---
+requests==2.32.3
+
+# --- Step 2: S3 upload ---
+boto3==1.34.144
+
+# --- Step 3: Databricks (Unity Catalog setup, Bronze/Silver/Gold) ---
+databricks-sdk==0.29.0
+
+# --- Later steps (uncommented as we build) ---
+# databricks-sql-connector   # dashboard refresh queries Databricks SQL warehouse directly
+# plotly                     # static HTML charts
