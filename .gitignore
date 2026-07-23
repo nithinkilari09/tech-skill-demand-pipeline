@@ -8,6 +8,10 @@ venv/
 data/raw/**/*.jsonl
 data/raw/**/*.json
 
+# Generated dashboard (rebuilt by .github/workflows/dashboard.yml, published
+# straight to the gh-pages Actions artifact -- not meant to live in git)
+dashboard/dist/
+
 # Secrets / credentials (AWS, Snowflake, Databricks tokens)
 .env
 *.pem
