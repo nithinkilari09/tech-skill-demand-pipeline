@@ -13,6 +13,13 @@ or visa sponsorship.
 
 ## Status
 
+🟢 **Live: https://nithinkilari09.github.io/tech-skill-demand-pipeline/** — the full
+pipeline is now genuinely scheduled end to end, not manually triggered at any stage.
+GitHub Actions pools postings daily, a Databricks Job runs Bronze→Silver→Gold right after,
+and this dashboard rebuilds itself once Gold is fresh — every schedule verified with a real
+triggered run (not just its definition), including a fresh S3 object confirmed after the
+ingestion workflow's first live run.
+
 🟢 **Gold layer complete and independently verified** — four Delta tables under
 `tech_skill_demand.gold` (`domain_summary`, `skill_demand_by_domain`,
 `broad_field_summary`, `skill_demand_by_broad_field`) aggregating Silver's skill/domain
@@ -53,8 +60,13 @@ Milestones (each confirmed with the project owner before moving to the next):
 - [x] Silver layer: dedup, domain classification, skill extraction (hand-verified)
 - [x] Gold layer (skill-demand-by-domain and by-broad_field aggregates), verified via the Databricks SQL warehouse
 - [x] Databricks Workflows DAG scheduled (Bronze ×2 → Silver → Gold, daily 04:00 UTC, verified via a real triggered run)
-- [ ] GitHub Actions: daily ingestion → S3 upload, on a schedule (workflow written, secrets set, not yet verified running in GitHub's own infrastructure)
-- [ ] GitHub Pages dashboard live (Plotly, static HTML, via `databricks-sql-connector`; built and verified locally, not yet deployed)
+- [x] GitHub Actions: daily ingestion → S3 upload, on a schedule (verified with a real triggered run — fresh object confirmed landing in S3)
+- [x] GitHub Pages dashboard live at https://nithinkilari09.github.io/tech-skill-demand-pipeline/ (Plotly, static HTML, via `databricks-sql-connector`, rebuilt daily by GitHub Actions)
+
+**Every stage of the pipeline now runs on its own schedule, with nobody triggering it by hand:**
+GitHub Actions pools RemoteOK + Arbeitnow daily (03:00 UTC) → a Databricks Job runs
+Bronze → Silver → Gold (04:00 UTC) → this dashboard rebuilds itself (06:00 UTC). All three
+schedules verified with real triggered runs, not just their definitions.
 
 ## Architecture
 
