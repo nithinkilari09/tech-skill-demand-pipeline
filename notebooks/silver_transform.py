@@ -483,7 +483,8 @@ cleaned_postings = deduped.withColumn(
 # MAGIC hand-checking real postings confirmed most of it is genuinely non-tech
 # MAGIC work (accounting, sales/marketing, healthcare, skilled trades,
 # MAGIC administrative/support, education, retail, hospitality, manufacturing/
-# MAGIC logistics, legal/HR), not a CS-domain classifier gap -- see BUILD_LOG.md.
+# MAGIC logistics, legal/HR, IT support/infrastructure, project/product
+# MAGIC management), not a CS-domain classifier gap -- see BUILD_LOG.md.
 # MAGIC Deliberately simpler than the CS-domain classifier (title -> a modest
 # MAGIC tool-based skill signal -> tags, same priority order, but shallower
 # MAGIC keyword lists per bucket): this only needs to be directionally useful,
@@ -564,6 +565,31 @@ BROAD_FIELD_RULES = [
         r"\bpersonalsachbearbeiter\b", r"\brechtsanwalt\b", r"\bjurist\b",
         r"\blegal\b", r"\bcompliance\b", r"\blawyer\b", r"\battorney\b",
         r"\bra-spezialist", r"\bkanzlei\b",
+    ]),
+    # Fifth round, added after analyzing all 448 titles still in
+    # broad_field='Other' by hand: these two were by far the largest
+    # identifiable clusters left -- IT support/infrastructure/QA roles and
+    # project/product management roles, neither of which fit the CS-domain
+    # taxonomy (no sysadmin/QA/PM bucket in the fixed 6) nor any broad_field
+    # bucket above. Appended at the end of the list so every existing bucket
+    # above still gets first claim -- these only catch what nothing else did.
+    ("IT Support & Infrastructure", [
+        r"\bsystemadministrator\b", r"\bit[\s-]?support\b", r"\bhelp ?desk\b",
+        r"\bservice desk\b", r"\bnetzwerk\b", r"\bnetwork (engineer|security|administrator)\b",
+        r"\bcyber-?security\b", r"\bsecurity (architect|specialist)\b",
+        r"\bit[\s-]?administrator\b", r"\bit[\s-]?consultant\b", r"\barchitect\b", r"\barchitekt\b",
+        r"\bsap\b", r"\bdevops\b", r"\bobservability\b", r"\bit systems? engineer\b",
+        r"\bquality assurance\b", r"\bqa\b", r"\btest engineer\b", r"\btest automation\b",
+        r"\bsoftware tester\b", r"\btester\b", r"\bqualitätssicherung\b",
+        r"\bqualitätsmanag", r"\bqualitätskontrolle\b",
+    ]),
+    ("Project & Product Management", [
+        r"\bproject manager\b", r"\bprojektmanager", r"\bprojektleiter\b",
+        r"\bprojektkoordinat", r"\bprojektassistenz\b", r"\bproduct manager\b",
+        r"\bproduktmanager\b", r"\bproduct owner\b", r"\bprogram manager\b",
+        r"\bproject lead\b", r"\btechnical lead\b", r"\bengineering lead\b",
+        r"\bteam lead\b", r"\bimplementierungsmanager\b", r"\bkonfigurationsmanager\b",
+        r"\bscrum master\b", r"\bhead of engineering\b",
     ]),
 ]
 _broad_field_compiled = [(name, [re.compile(p, re.IGNORECASE) for p in pats]) for name, pats in BROAD_FIELD_RULES]
