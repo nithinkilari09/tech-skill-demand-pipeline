@@ -235,11 +235,11 @@ def render_page(figures, context):
     ])
 
     pipeline = "".join([
-        pipeline_step("\U0001F4E5", "Ingest", "RemoteOK + Arbeitnow", False),
-        pipeline_step("\U0001F5C4️", "Bronze", "Raw postings landed", False),
-        pipeline_step("\U0001F9F9", "Silver", "Classified & skill-matched", False),
-        pipeline_step("\U0001F4CA", "Gold", "Skill-demand aggregates", False),
-        pipeline_step("\U0001F310", "This dashboard", "Rebuilt daily", True),
+        pipeline_step("\U0001F4E5", "Ingest", "Daily 03:00 UTC (GitHub Actions)", True),
+        pipeline_step("\U0001F5C4️", "Bronze", "Daily 04:00 UTC (Databricks Job)", True),
+        pipeline_step("\U0001F9F9", "Silver", "Daily 04:00 UTC (Databricks Job)", True),
+        pipeline_step("\U0001F4CA", "Gold", "Daily 04:00 UTC (Databricks Job)", True),
+        pipeline_step("\U0001F310", "This dashboard", "Daily 06:00 UTC (GitHub Actions)", True),
     ])
 
     html = f"""<!doctype html>
@@ -420,9 +420,9 @@ def render_page(figures, context):
     <div class="automation-card">
       <h2>Built to run itself, on a schedule</h2>
       <p>The whole point of this project is a pipeline that keeps itself current without a human
-      re-running anything. This dashboard's own rebuild is already fully automated (GitHub Actions,
-      cron-scheduled, no server to keep running); wiring the same time-based scheduling into the
-      ingestion &rarr; Bronze &rarr; Silver &rarr; Gold steps upstream is the next milestone.</p>
+      re-running anything. Every stage below runs on its own schedule with nobody triggering it by
+      hand: GitHub Actions pools RemoteOK + Arbeitnow daily, a Databricks Job runs Bronze &rarr;
+      Silver &rarr; Gold right after, and this page rebuilds itself once Gold is fresh.</p>
       <div class="pipeline">
         {pipeline}
       </div>
