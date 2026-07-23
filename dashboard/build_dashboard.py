@@ -468,11 +468,29 @@ def render_page(figures, context):
     return html
 
 
+def _connect(host, http_path, token):
+    try:
+        return sql.connect(server_hostname=host, http_path=http_path, access_token=token)
+    except Exception as e:
+        # databricks-sql-connector's own RequestError message is often just
+        # "Error during request to server." with the actual cause buried in
+        # __cause__/__context__ -- surface those explicitly so CI logs show
+        # what actually failed instead of the generic wrapper message.
+        print(f"Connection failed: {type(e).__name__}: {e}")
+        cause = e.__cause__ or e.__context__
+        depth = 0
+        while cause is not None and depth < 5:
+            print(f"  caused by: {type(cause).__name__}: {cause}")
+            cause = cause.__cause__ or cause.__context__
+            depth += 1
+        raise
+
+
 def main():
     host, http_path, token = _connection_params()
     print(f"Connecting to {host}{http_path} ...")
 
-    with sql.connect(server_hostname=host, http_path=http_path, access_token=token) as conn:
+    with _connect(host, http_path, token) as conn:
         with conn.cursor() as cursor:
             domain_summary = fetch_table(
                 cursor,
