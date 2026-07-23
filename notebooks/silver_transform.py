@@ -227,6 +227,28 @@ SKILL_DICTIONARY = [
     {"skill": "Machine Learning", "category": "ml", "patterns": [r"\bmachine learning\b"]},
     {"skill": "TensorFlow", "category": "ml", "patterns": [r"\btensorflow\b"]},
     {"skill": "PyTorch", "category": "ml", "patterns": [r"\bpytorch\b"]},
+
+    # Non-CS tools -- a deliberately modest, bounded list (not exhaustive,
+    # same as the CS entries above) covering the tools that showed up
+    # repeatedly while hand-checking real other/uncategorized postings for
+    # the broad-field pass below: Salesforce/HubSpot/Mailchimp for sales &
+    # marketing roles, QuickBooks for finance/accounting, SAP for the many
+    # German finance/ERP postings, Photoshop/Illustrator/Canva for
+    # creative/marketing roles, AutoCAD for skilled-trades/technical-drafting
+    # roles, Zendesk for support roles. Reuses the exact same
+    # extract_skills()/posting_skills fact-table machinery as the CS skills
+    # above -- one row per (source, job_id, skill) either way, distinguished
+    # by category, not a parallel system.
+    {"skill": "Salesforce", "category": "sales_tool", "patterns": [r"\bsalesforce\b"]},
+    {"skill": "HubSpot", "category": "sales_tool", "patterns": [r"\bhubspot\b"]},
+    {"skill": "Mailchimp", "category": "sales_tool", "patterns": [r"\bmailchimp\b"]},
+    {"skill": "QuickBooks", "category": "finance_tool", "patterns": [r"\bquickbooks\b"]},
+    {"skill": "SAP", "category": "erp_tool", "patterns": [r"\bsap\b"]},
+    {"skill": "Photoshop", "category": "design_tool", "patterns": [r"\bphotoshop\b"]},
+    {"skill": "Illustrator", "category": "design_tool", "patterns": [r"\billustrator\b"]},
+    {"skill": "Canva", "category": "design_tool", "patterns": [r"\bcanva\b"]},
+    {"skill": "AutoCAD", "category": "design_tool", "patterns": [r"\bautocad\b"]},
+    {"skill": "Zendesk", "category": "support_tool", "patterns": [r"\bzendesk\b"]},
 ]
 
 _compiled_skills = [
@@ -272,8 +294,22 @@ def extract_skills(text):
 
 extract_skills_udf = F.udf(extract_skills, ArrayType(StringType()))
 
-matching_text = F.concat_ws(
-    " ", F.col("title"), F.col("description_clean"), F.array_join(F.col("tags"), " ")
+# Strips soft hyphens (U+00AD) and zero-width characters before any pattern
+# matching runs. Found by hand-checking a real title that should have matched
+# "Softwareentwickler" but didn't: "Software­entwickler" (a soft hyphen
+# embedded between "Software" and "entwickler", almost certainly carried over
+# from a web page's line-break hint) is invisible when printed but isn't a
+# word character `\b`/`[\s-]?` will bridge, so it silently splits the token in
+# two for matching purposes even though it reads as one word. Applied to
+# BOTH the skill-matching text and (inside classify_domain, on the raw title)
+# domain-classification text, not just this one word, since any title/
+# description scraped from the web could carry the same invisible characters.
+_INVISIBLE_CHARS_RE = re.compile(r"[­​‌‍]")
+
+matching_text = F.regexp_replace(
+    F.concat_ws(" ", F.col("title"), F.col("description_clean"), F.array_join(F.col("tags"), " ")),
+    r"[­​‌‍]",
+    "",
 )
 
 # Computed once here, used twice: as a domain-classification signal below, and
@@ -303,12 +339,35 @@ deduped = deduped.withColumn("skills", extract_skills_udf(matching_text))
 # MAGIC
 # MAGIC Titles/skills that don't clearly match stay in `other/uncategorized` --
 # MAGIC forcing a weak match would be worse than an honest "doesn't fit" bucket.
-# MAGIC Known limitation: purely keyword-based, English-only. Many Arbeitnow
-# MAGIC postings have German-language titles (e.g. "Softwareentwickler") this rule
-# MAGIC set will not match -- they fall to `other/uncategorized`, under-representing
-# MAGIC German postings in the domain breakdown. Not solved here.
+# MAGIC `DOMAIN_RULES` includes German-language title patterns alongside the
+# MAGIC English ones (Softwareentwickler/Vollstack-Entwickler -> full-stack,
+# MAGIC Datenanalyst(in) -> data analyst, Dateningenieur -> data engineer,
+# MAGIC Frontend-/Backend-/App-/iOS-/Android-Entwickler(in) -> their English
+# MAGIC counterparts) so Arbeitnow's mostly-German postings aren't systematically
+# MAGIC under-represented just because the rules were English-only. Verified by
+# MAGIC hand-checking real "other"-bucket titles first: most of that bucket is
+# MAGIC genuinely non-tech (Buchhalter/accountant, Personaldisponent/HR-staffing,
+# MAGIC Kundenberater/customer-service roles are the bulk of it, in German and
+# MAGIC English alike) -- so a large residual "other" bucket after this pass is
+# MAGIC expected, not a sign the classifier is still missing something.
 
 # COMMAND ----------
+
+# German titles get their own patterns per domain rather than a translation
+# step -- same taxonomy, same priority order (title -> skills -> tags), just
+# covering the German compound-noun equivalents of each English title pattern
+# above. `GENDER_SUFFIX` covers the several ways German job postings mark
+# gender-neutral/feminine forms on a role noun: "Entwickler", "Entwicklerin",
+# "Entwickler:in", "Entwickler*in", "Entwickler/in" all need to match.
+# Deliberately NOT adding bare "Entwickler"/"Programmierer" (German for
+# "developer"/"programmer" with no stack/domain qualifier) -- same reasoning
+# as bare English "Developer" staying unclassified: too vague to guess
+# frontend/backend/full-stack from. "Softwareentwickler" is the one
+# qualified-but-still-generic exception mapped straight to full-stack, since
+# unlike English postings (which usually name a stack), German dev postings
+# very commonly use unqualified "(Software-)Entwickler" as the generic title
+# for what would be called a full-stack/generalist developer role in English.
+GENDER_SUFFIX = r"(?:[:/*]?in)?"
 
 DOMAIN_RULES = [
     ("data engineer", [
@@ -318,25 +377,53 @@ DOMAIN_RULES = [
         r"\bbig data engineer\b", r"\bbig data developer\b",
         r"\bmachine learning engineer\b", r"\bml engineer\b",
         r"\bdataops\b", r"\bdata ops\b", r"software engineer,?\s*data\b",
+        # German
+        rf"\bdaten[\s-]?ingenieur{GENDER_SUFFIX}\b", rf"\betl[\s-]?entwickler{GENDER_SUFFIX}\b",
     ]),
     ("data analyst", [
         r"\bdata analyst", r"\bbusiness analyst", r"\bbi analyst\b", r"\bbusiness intelligence\b",
         r"\breporting analyst\b", r"\bdata analytics\b", r"\bbi developer\b",
         r"\binsights analyst\b", r"\banalytics manager\b", r"\bdata scientist\b", r"\bdata science\b",
+        # German
+        rf"\bdaten[\s-]?analyst{GENDER_SUFFIX}\b", rf"\bdaten[\s-]?analytiker{GENDER_SUFFIX}\b",
     ]),
     ("mobile", [
         r"\bios developer", r"\bandroid developer", r"\bmobile developer", r"\bmobile engineer",
         r"\breact native\b", r"\bflutter\b", r"\bkotlin developer\b", r"\bswift developer\b",
+        # German
+        rf"\bapp[\s-]?entwickler{GENDER_SUFFIX}\b", rf"\bios[\s-]?entwickler{GENDER_SUFFIX}\b",
+        rf"\bandroid[\s-]?entwickler{GENDER_SUFFIX}\b",
     ]),
     ("frontend", [
         r"\bfront[\s-]?end", r"\bui developer", r"\bui engineer", r"\bui/ux engineer",
         r"\breact developer", r"\bangular developer", r"\bvue developer", r"\bweb developer",
+        # German (front[\s-]?end above already matches "Frontend-Entwickler" as
+        # a substring, but spelled out explicitly so this rule's German
+        # coverage doesn't silently depend on that overlap)
+        rf"\bfrontend[\s-]?entwickler{GENDER_SUFFIX}\b", rf"\bweb[\s-]?entwickler{GENDER_SUFFIX}\b",
     ]),
     ("backend", [
         r"\bback[\s-]?end", r"\bapi developer", r"\bapi engineer", r"\bserver-side\b",
         r"\bplatform engineer\b",
+        # German
+        rf"\bbackend[\s-]?entwickler{GENDER_SUFFIX}\b",
     ]),
-    ("full-stack", [r"\bfull[\s-]?stack"]),
+    ("full-stack", [
+        r"\bfull[\s-]?stack",
+        # German -- see the note above GENDER_SUFFIX for why bare
+        # "Softwareentwickler" (not just "Vollstack-Entwickler") lands here.
+        # Also covers "<Language> Entwickler" titles ("Python Entwickler",
+        # "Java Entwickler") for the same reason -- a language-qualified but
+        # otherwise generic developer title, found by hand-checking real
+        # postings still in other/uncategorized ("Senior Python Entwickler",
+        # "Beratender Senior Java Entwickler"). Deliberately excludes SAP --
+        # "SAP Entwickler" is an ERP-specific title, same reasoning as why
+        # "(Senior) Developer SAP ABAP" stays other/uncategorized in English.
+        rf"\bvoll[\s-]?stack{GENDER_SUFFIX}\b", rf"\bvollstack[\s-]?entwickler{GENDER_SUFFIX}\b",
+        rf"\bsoftware[\s-]?entwickler{GENDER_SUFFIX}\b",
+        rf"\b(?:python|java|javascript|typescript|php|ruby|kotlin|swift|scala|rust|c\+\+|c#)"
+        rf"[\s-]?entwickler{GENDER_SUFFIX}\b",
+    ]),
 ]
 _domain_compiled = [(name, [re.compile(p, re.IGNORECASE) for p in pats]) for name, pats in DOMAIN_RULES]
 
@@ -361,8 +448,8 @@ DOMAIN_SKILL_SIGNALS = [
 
 
 def classify_domain(title, tags_list, skills_list):
-    title_text = title or ""
-    tags_text = " ".join(tags_list) if tags_list else ""
+    title_text = _INVISIBLE_CHARS_RE.sub("", title) if title else ""
+    tags_text = _INVISIBLE_CHARS_RE.sub("", " ".join(tags_list)) if tags_list else ""
     skills_set = set(skills_list) if skills_list else set()
 
     for name, patterns in _domain_compiled:
@@ -388,12 +475,119 @@ cleaned_postings = deduped.withColumn(
 
 # COMMAND ----------
 
+# MAGIC %md ### Broad-field classification: a second, coarser dimension
+# MAGIC
+# MAGIC `domain` above is the primary CS-domain taxonomy and stays the main
+# MAGIC dashboard story. This is a separate, secondary dimension applied to give
+# MAGIC the large `other/uncategorized` CS-domain bucket some structure, since
+# MAGIC hand-checking real postings confirmed most of it is genuinely non-tech
+# MAGIC work (accounting, sales/marketing, healthcare, skilled trades,
+# MAGIC administrative/support, education), not a CS-domain classifier gap --
+# MAGIC see BUILD_LOG.md. Deliberately simpler than the CS-domain classifier
+# MAGIC (title -> a modest tool-based skill signal -> tags, same priority order,
+# MAGIC but shallower keyword lists per bucket): this only needs to be
+# MAGIC directionally useful, not as rigorously verified as the primary taxonomy.
+# MAGIC Every posting gets a broad_field value, including ones with a real
+# MAGIC CS domain (those just won't match any non-tech bucket and will fall to
+# MAGIC "Other" here, which is fine -- this column is only surfaced in the
+# MAGIC dashboard's separate "Beyond Tech" section, not mixed into the primary
+# MAGIC domain breakdown).
+
+# COMMAND ----------
+
+BROAD_FIELD_RULES = [
+    # Checked in this order so specific service/trade titles resolve before
+    # broader "customer-facing"/"medical-adjacent" keywords could misfire
+    # (e.g. "Medical Equipment Service Technician" is Skilled Trades, not
+    # Healthcare -- it matches the technician pattern first).
+    ("Skilled Trades", [
+        r"\belektri(k|ker)\b", r"\belektroniker\b", r"\bmechatroniker\b",
+        r"\btechniker\b", r"\bservicetechniker\b", r"\bservice technician\b",
+        r"\bmonteur\b", r"\bhandwerk", r"\bbauleiter\b", r"\bbauingenieur\b",
+        r"\belectrician\b", r"\bplumber\b", r"\bhvac\b", r"\bfahrer\b",
+        r"\bschädlingsbekämpfer\b", r"\bkfz\b",
+    ]),
+    ("Healthcare", [
+        r"\bpflegefachkraft\b", r"\bpflegekraft\b", r"\baltenpfleger\b",
+        r"\bkrankenpfleger\b", r"\bkrankenschwester\b", r"\bphysiotherapeut\b",
+        r"\bmedizinische[nr]? fachangestellte\b", r"\bnurse\b", r"\bphysician\b",
+        r"\bhealthcare\b",
+    ]),
+    ("Finance & Accounting", [
+        r"\bbuchhalt", r"\bbilanzbuchhalter\b", r"\bsteuerfach", r"\bsteuerberat",
+        r"\baccountant\b", r"\bcontroller\b", r"\bcontrolling\b",
+        r"\bfinanzbuchhalt", r"\bkreditsachbearbeit", r"\bkreditorenbuchhalter\b",
+        r"\bdebitorenbuchhalter\b", r"\baccounting\b", r"\bpayroll\b",
+        r"\blohnbuchhalt", r"\btax\b", r"\bauditor\b", r"\btreasury\b", r"\bkyc\b",
+    ]),
+    ("Sales & Marketing", [
+        r"\bsales\b", r"\bvertrieb", r"\bmarketing\b", r"\baccount executive\b",
+        r"\baccount manager\b", r"\bkey account\b", r"\bbusiness development\b",
+        r"\bsdr\b", r"\bcustomer success\b", r"\binfluencer\b", r"\bsocial media\b",
+        r"\bseo\b", r"\bsea\b", r"\bcontent creator\b", r"\bcopywriter\b",
+        r"\bgrowth\b", r"\bpaid (media|social|acquisition)\b",
+        r"\bperformance marketing\b", r"\bkundenberater", r"\bkundenbetreuung",
+        r"\bgraphic designer\b", r"\bgrafikdesigner",
+    ]),
+    ("Administrative/Support", [
+        r"\bassistenz\b", r"\boffice manager\b", r"\bverwaltung\b",
+        r"\bsachbearbeiter\b", r"\badministrative assistant\b", r"\breceptionist\b",
+        r"\bpersonalreferent\b", r"\bpersonaldisponent\b", r"\bhuman resources\b", r"\bhr\b",
+        r"\bteam assistant\b", r"\boffice coordinator\b", r"\bcustomer service\b",
+        r"\bkundenservice\b", r"\bkundendienst\b",
+    ]),
+    ("Education", [
+        r"\blehrer\b", r"\bdozent\b", r"\bausbilder\b", r"\bteacher\b",
+        r"\bprofessor\b", r"\btutor\b", r"\binstructor\b",
+    ]),
+]
+_broad_field_compiled = [(name, [re.compile(p, re.IGNORECASE) for p in pats]) for name, pats in BROAD_FIELD_RULES]
+
+# Non-CS tool signal, same idea as DOMAIN_SKILL_SIGNALS but for the broad-field
+# pass -- a posting mentioning Salesforce/HubSpot is a real sales/marketing
+# signal even if the title alone doesn't say so.
+BROAD_FIELD_SKILL_SIGNALS = [
+    ("Sales & Marketing", {"Salesforce", "HubSpot", "Mailchimp", "Photoshop", "Illustrator", "Canva"}),
+    ("Finance & Accounting", {"QuickBooks"}),
+    ("Skilled Trades", {"AutoCAD"}),
+    ("Administrative/Support", {"Zendesk"}),
+]
+
+
+def classify_broad_field(title, tags_list, skills_list):
+    title_text = _INVISIBLE_CHARS_RE.sub("", title) if title else ""
+    tags_text = _INVISIBLE_CHARS_RE.sub("", " ".join(tags_list)) if tags_list else ""
+    skills_set = set(skills_list) if skills_list else set()
+
+    for name, patterns in _broad_field_compiled:
+        if any(p.search(title_text) for p in patterns):
+            return name
+
+    for name, signal_skills in BROAD_FIELD_SKILL_SIGNALS:
+        if signal_skills & skills_set:
+            return name
+
+    for name, patterns in _broad_field_compiled:
+        if any(p.search(tags_text) for p in patterns):
+            return name
+
+    return "Other"
+
+
+classify_broad_field_udf = F.udf(classify_broad_field, StringType())
+
+cleaned_postings = cleaned_postings.withColumn(
+    "broad_field", classify_broad_field_udf(F.col("title"), F.col("tags"), F.col("skills"))
+)
+
+# COMMAND ----------
+
 # MAGIC %md ### Write cleaned_postings and the posting_skills fact table
 # MAGIC
-# MAGIC `skills` was only ever an intermediate column (input to domain
-# MAGIC classification) -- dropped before the final write since `posting_skills`
-# MAGIC is the properly normalized place for that information, not a denormalized
-# MAGIC array sitting on the postings table too.
+# MAGIC `skills` was only ever an intermediate column (input to both domain and
+# MAGIC broad_field classification) -- dropped before the final write since
+# MAGIC `posting_skills` is the properly normalized place for that information,
+# MAGIC not a denormalized array sitting on the postings table too.
 
 # COMMAND ----------
 
@@ -434,7 +628,7 @@ print(f"{CATALOG}.silver.skill_dictionary: {skill_dictionary_df.count()} rows")
 
 # COMMAND ----------
 
-# MAGIC %md ### Domain distribution (sanity check on every run)
+# MAGIC %md ### Domain and broad-field distribution (sanity check on every run)
 
 # COMMAND ----------
 
@@ -442,4 +636,21 @@ display(spark.sql(f"""
     SELECT domain, count(*) AS n
     FROM {CATALOG}.silver.cleaned_postings
     GROUP BY domain ORDER BY n DESC
+"""))
+
+# COMMAND ----------
+
+display(spark.sql(f"""
+    SELECT broad_field, count(*) AS n
+    FROM {CATALOG}.silver.cleaned_postings
+    GROUP BY broad_field ORDER BY n DESC
+"""))
+
+# COMMAND ----------
+
+display(spark.sql(f"""
+    SELECT broad_field, count(*) AS n
+    FROM {CATALOG}.silver.cleaned_postings
+    WHERE domain = 'other/uncategorized'
+    GROUP BY broad_field ORDER BY n DESC
 """))
