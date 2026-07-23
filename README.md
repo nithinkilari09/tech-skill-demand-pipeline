@@ -17,16 +17,21 @@ or visa sponsorship.
 `(source, job_id)`, classified into a fixed CS-domain taxonomy (title → extracted skills →
 tags, including German-language title patterns) plus a second, coarser `broad_field`
 dimension (Sales & Marketing, Finance & Accounting, Healthcare, Skilled Trades,
-Administrative/Support, Education, Other), and matched against a 61-entry skill dictionary
-into a posting-to-skill fact table (1,039 rows). Final CS-domain distribution:
-`other/uncategorized` 873/1002 (87.1%, confirmed genuine non-tech job-board composition,
-not a classifier gap — RemoteOK, 100% English, sits at 83.8% too), full-stack 27, data
-analyst 26, data engineer 24, frontend 22, backend 21, mobile 9. Within that 873, the
-broad_field pass gives 481 postings (55%) a meaningful non-tech field label. Skill
-extraction was hand-checked against real postings throughout, catching and fixing five
-real bugs total (Unicode-boundary regex, undecoded HTML entities, English-word ambiguity
-on "Go", a soft-hyphen character breaking a German title match, and missing "`<Language>
-Entwickler`" title coverage) — full detail in BUILD_LOG.md.
+Administrative/Support, Education, Retail & Customer Service, Hospitality & Food Service,
+Manufacturing & Logistics, Legal & HR, Other — four rounds of buckets, final), and matched
+against a 61-entry skill dictionary into a posting-to-skill fact table (1,039 rows). Final
+CS-domain distribution: `other/uncategorized` 873/1002 (87.1%, confirmed genuine non-tech
+job-board composition, not a classifier gap — RemoteOK, 100% English, sits at 83.8% too),
+full-stack 27, data analyst 26, data engineer 24, frontend 22, backend 21, mobile 9. Within
+that 873, the broad_field passes give 522 postings (60%) a meaningful non-tech field label
+(Sales & Marketing 265, Finance & Accounting 131, Administrative/Support 54, Legal & HR 22,
+Skilled Trades 21, Manufacturing & Logistics 20, Hospitality & Food Service 4, Retail &
+Customer Service 3, Healthcare 2), leaving 351 (40%) in a final, accepted long tail —
+stopped narrowing further per an explicit decision to move to Gold rather than chase
+diminishing returns. Skill extraction was hand-checked against real postings throughout,
+catching and fixing five real bugs total (Unicode-boundary regex, undecoded HTML entities,
+English-word ambiguity on "Go", a soft-hyphen character breaking a German title match, and
+missing "`<Language> Entwickler`" title coverage) — full detail in BUILD_LOG.md.
 
 Milestones (each confirmed with the project owner before moving to the next):
 - [x] RemoteOK + Arbeitnow ingestion script (pooling, tested against live APIs)
@@ -200,13 +205,18 @@ hyphen breaking a match, missing "`<Language> Entwickler`" coverage).
 
 **Broad-field classification** (`broad_field` column) is a second, coarser, deliberately
 less-rigorous dimension that exists to give the large `other/uncategorized` bucket some
-structure for a planned "Beyond Tech" dashboard section: `Sales & Marketing`, `Finance &
+structure for a "Beyond Tech" dashboard section: `Sales & Marketing`, `Finance &
 Accounting`, `Healthcare`, `Skilled Trades`, `Administrative/Support`, `Education`,
-`Other`. Same title → skill-signal → tags priority pattern as `domain`, shallower keyword
-lists. Within the 873 `other/uncategorized` postings: Sales & Marketing 266, Finance &
-Accounting 131, Administrative/Support 61, Skilled Trades 21, Healthcare 2, still
-unclassified 392 (45%) — 55% of the CS-domain "other" bucket now carries a meaningful
-label.
+`Retail & Customer Service`, `Hospitality & Food Service`, `Manufacturing & Logistics`,
+`Legal & HR`, `Other`. Same title → skill-signal → tags priority pattern as `domain`,
+shallower keyword lists, four rounds of buckets added and now final. Within the 873
+`other/uncategorized` postings: Sales & Marketing 265, Finance & Accounting 131,
+Administrative/Support 54, Legal & HR 22, Skilled Trades 21, Manufacturing & Logistics 20,
+Hospitality & Food Service 4, Retail & Customer Service 3, Healthcare 2, still unclassified
+351 (40%) — 60% of the CS-domain "other" bucket now carries a meaningful label. Known,
+accepted noise at this bucket's lightweight bar (not fixed further): bare "warehouse"
+false-matches "Data Warehouse" in tech-adjacent titles; a couple of hotel-facility-
+engineering titles land in Hospitality & Food Service rather than Skilled Trades.
 
 **Skill extraction** matches a 61-entry hand-curated dictionary (languages, cloud, data
 tools, databases, BI tools, frameworks, devops, ML, plus a modest non-CS tool set —
