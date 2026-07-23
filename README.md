@@ -13,6 +13,14 @@ or visa sponsorship.
 
 ## Status
 
+🟢 **Gold layer complete and independently verified** — four Delta tables under
+`tech_skill_demand.gold` (`domain_summary`, `skill_demand_by_domain`,
+`broad_field_summary`, `skill_demand_by_broad_field`) aggregating Silver's skill/domain
+data for the dashboard. Top skills per domain read as a believable real distribution
+(data analyst → Power BI/Python/SQL/Excel; data engineer → Python/Docker/AWS/Kubernetes;
+frontend → HTML/JavaScript/CSS/TypeScript/React; Sales & Marketing → Photoshop/
+Illustrator/Canva/HubSpot) — full detail in BUILD_LOG.md.
+
 🟢 **Silver layer complete and hand-verified** — 1,002 postings deduped on
 `(source, job_id)`, classified into a fixed CS-domain taxonomy (title → extracted skills →
 tags, including German-language title patterns) plus a second, coarser `broad_field`
@@ -39,7 +47,7 @@ Milestones (each confirmed with the project owner before moving to the next):
 - [x] Unity Catalog storage credential + external location verified working
 - [x] Bronze layer reading real data into Delta tables
 - [x] Silver layer: dedup, domain classification, skill extraction (hand-verified)
-- [ ] Gold layer (skill-demand-by-domain aggregates) queryable from the Databricks SQL warehouse
+- [x] Gold layer (skill-demand-by-domain and by-broad_field aggregates), verified via the Databricks SQL warehouse
 - [ ] GitHub Pages dashboard live (Plotly, static HTML, via `databricks-sql-connector`)
 - [ ] Databricks Workflows DAG scheduled (`Trigger.AvailableNow`)
 
@@ -139,7 +147,8 @@ tech-skill-demand-pipeline/
 │   └── setup_uc_iam_role.py       # IAM role create (placeholder trust policy) + finalize (real external ID)
 ├── notebooks/                   # Databricks Bronze/Silver/Gold notebooks (PySpark, Delta Lake)
 │   ├── bronze_ingest.py            # Auto Loader, trigger(availableNow=True), parameterized by source
-│   └── silver_transform.py         # normalize, dedup, domain classification, skill extraction
+│   ├── silver_transform.py         # normalize, dedup, domain + broad_field classification, skill extraction
+│   └── gold_aggregate.py           # skill-demand aggregates by domain and broad_field
 └── dashboard/                    # (later) Plotly HTML + GitHub Pages site
 ```
 
@@ -229,6 +238,23 @@ full investigation (a Unicode-boundary regex bug, undecoded HTML entities, and "
 requiring co-occurrence with another recognized language to count, since it's an ordinary
 English word otherwise). The dictionary is explicitly a maintained list, not exhaustive —
 extend `SKILL_DICTIONARY` in `notebooks/silver_transform.py` as new tools show up.
+
+## Gold layer
+
+Four Delta tables in `tech_skill_demand.gold`, built by `notebooks/gold_aggregate.py`,
+full-recompute from Silver every run (same reasoning as Silver's dedup — simple and fully
+correct at this data scale):
+
+| table                          | grain                          | notes |
+|---------------------------------|--------------------------------|-------|
+| `domain_summary`                | one row per `domain`           | posting count per CS-domain bucket |
+| `skill_demand_by_domain`        | one row per `(domain, skill)`  | mention counts — the primary dashboard story |
+| `broad_field_summary`           | one row per `broad_field`      | posting count per broad_field bucket |
+| `skill_demand_by_broad_field`   | one row per `(broad_field, skill)` | mention counts — feeds the "Beyond Tech" dashboard section |
+
+Both skill-demand tables deliberately include every skill (CS and non-CS) against **both**
+dimensions rather than splitting the dictionary in half — Excel is real signal under both
+`data analyst` (domain) and `Finance & Accounting` (broad_field).
 
 ## Setup
 
