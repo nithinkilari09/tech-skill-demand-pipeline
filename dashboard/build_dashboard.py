@@ -469,11 +469,6 @@ def render_page(figures, context):
 
 
 def _connect(host, http_path, token):
-    import logging
-
-    logging.basicConfig(level=logging.DEBUG)
-    logging.getLogger("databricks.sql").setLevel(logging.DEBUG)
-    logging.getLogger("urllib3").setLevel(logging.DEBUG)
     try:
         return sql.connect(server_hostname=host, http_path=http_path, access_token=token)
     except Exception as e:
