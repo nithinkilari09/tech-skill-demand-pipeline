@@ -49,37 +49,27 @@ schedules verified with real triggered runs, not just their definitions.
 
 ## Architecture
 
-```
-┌───────────────────┐     ┌──────────────────┐     ┌──────────────────────────────────┐
-│ ingestion/          │───▶│  AWS S3           │───▶│  Databricks + PySpark              │
-│ pool_postings.py    │    │  (raw landing,    │    │  Unity Catalog: storage credential  │
-│ RemoteOK + Arbeitnow│    │   us-east-1,      │    │  + external location → S3 bucket    │
-│ scheduled daily via │    │   block public    │    │                                     │
-│ GitHub Actions       │    │   access, no       │    │  Bronze  → raw postings as landed   │
-│ (cron)               │    │   versioning,      │    │  Silver  → cleaned/deduplicated,     │
-└───────────────────┘     │   ~90-day lifecycle│    │            skills extracted via a      │
-                            │   source=X/         │    │            maintained keyword dict     │
-                            │   ingestion_date=Y/ │    │  Gold    → skill-demand-by-domain       │
-                            └──────────────────┘    │            aggregates over time,          │
-                                                       │            all as Delta tables            │
-                                                       │                                            │
-                                                       │  Orchestration: Databricks Workflows,       │
-                                                       │  Trigger.AvailableNow (only trigger          │
-                                                       │  serverless compute supports) — scheduled     │
-                                                       │  incremental runs, not 24/7                    │
-                                                       └──────────────────┬─────────────────────────────┘
-                                                                          │
-                                                                          │ Gold Delta tables served directly
-                                                                          │ from Databricks' built-in SQL
-                                                                          │ warehouse (Free Edition, 2X-Small)
-                                                                          ▼
-                                                              ┌────────────────────────────┐
-                                                              │  GitHub Actions (cron)       │
-                                                              │  queries the SQL warehouse    │
-                                                              │  via databricks-sql-connector │
-                                                              │  → renders Plotly HTML        │
-                                                              │  → publishes to GitHub Pages   │
-                                                              └────────────────────────────┘
+```mermaid
+flowchart LR
+    ingest["ingestion/pool_postings.py<br/>RemoteOK + Arbeitnow<br/><i>scheduled daily via GitHub Actions (cron)</i>"]
+    s3[("AWS S3 — raw landing<br/>us-east-1 · block public access · no versioning<br/>~90-day lifecycle<br/>source=X/ingestion_date=Y/")]
+
+    subgraph databricks ["Databricks + PySpark"]
+        direction TB
+        uc["Unity Catalog: storage credential<br/>+ external location → S3 bucket"]
+        bronze["Bronze<br/>raw postings as landed"]
+        silver["Silver<br/>cleaned/deduplicated, skills extracted<br/>via a maintained keyword dictionary"]
+        gold["Gold<br/>skill-demand-by-domain aggregates<br/>over time, all as Delta tables"]
+        uc --> bronze --> silver --> gold
+    end
+
+    orch["Orchestration: Databricks Workflows<br/>Trigger.AvailableNow<br/><i>(only trigger serverless compute supports)</i><br/>scheduled incremental runs, not 24/7"]
+    warehouse[["Databricks SQL Warehouse<br/>Free Edition, 2X-Small<br/>serves Gold Delta tables directly"]]
+    dashboard["GitHub Actions (cron)<br/>queries via databricks-sql-connector<br/>→ renders Plotly HTML<br/>→ publishes to GitHub Pages"]
+
+    ingest --> s3 --> databricks
+    orch -.-> databricks
+    gold --> warehouse --> dashboard
 ```
 
 **No Snowflake, no dbt** in this project — both intentionally reserved for a different
